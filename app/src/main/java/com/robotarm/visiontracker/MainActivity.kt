@@ -3,12 +3,16 @@ package com.robotarm.visiontracker
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Size
 import android.view.Surface
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
@@ -65,13 +69,36 @@ class MainActivity : AppCompatActivity() {
             try {
                 val cameraProvider = cameraProviderFuture.get()
 
+                // Preview em ALTA qualidade (o que você vê na tela)
+                val previewResolutionSelector = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size(1920, 1080),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        )
+                    )
+                    .build()
+
                 val preview = Preview.Builder()
+                    .setResolutionSelector(previewResolutionSelector)
                     .setTargetRotation(safeRotation)
                     .build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
 
+                // Análise em baixa resolução DE PROPÓSITO (bom pro YOLO rodar rápido depois)
+                val analysisResolutionSelector = ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size(640, 480),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        )
+                    )
+                    .build()
+
                 val analysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(analysisResolutionSelector)
                     .setTargetRotation(safeRotation)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -81,7 +108,7 @@ class MainActivity : AppCompatActivity() {
                     frameCount++
                     runOnUiThread {
                         statusText.text = "Câmera ativa - frame #$frameCount " +
-                            "(${imageProxy.width}x${imageProxy.height})"
+                            "(análise: ${imageProxy.width}x${imageProxy.height})"
                     }
                     imageProxy.close()
                 }
